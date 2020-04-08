@@ -9,4 +9,4 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.
 
 
-[3]: https://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har "HAR siteing"{target="_blank"}
+[3]: https://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har "HAR siteing"
