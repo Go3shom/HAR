@@ -1,0 +1,165 @@
+---
+title: "Human Activity Recognition"
+author: "Shady"
+date: "4/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+```
+## Introduction
+#### This data came from [GroupWareLES website][3]
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.
+
+### Install Required Packages
+```{r installation}
+#install.packages("caret", dependencies = TRUE)
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("corrplot")
+#install.packages("randomForest")
+
+# You may need to install "e1071" package too if "caret" dependencies was equal to FALSE
+# install.packages("e1071")
+```
+
+## Data Processing
+### 1. Load the Required packages.
+```{r cache=TRUE, warning=FALSE, echo=FALSE}
+# Using Packages
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(corrplot)
+library(randomForest)
+```
+
+#### Here we can Download the CSV required files:
+* **[Raw Training Data][1]**. 
+* **[Raw Testing Data][2]**.
+```{r dataset, cache=TRUE}
+# Downloading Dataset Files
+if(!file.exists("pml-training.csv")) {
+        trainUrl = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        download.file(trainUrl, "pml-training.csv", method = "curl")
+}
+
+if(!file.exists("pml-testing.csv")) {
+        testUrl = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(testUrl, "pml-testing.csv", method = "curl")
+}
+```
+
+### 2. Read and Store the raw datasets, then show its dimentions of them.
+```{r reading, cache=TRUE}
+# Reading Data
+trainRaw <- read.csv("pml-training.csv")
+testRaw <- read.csv("pml-testing.csv")
+
+```
+
+#### We notice that there are:
+##### <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">19622</span> training observations, <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">20</span> testing observations, and both of <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">160</span> variables.
+
+### 3. Select the only Needed Variables and Columns:
+```{r cleaninig, cache=TRUE}
+# Cleaninig Data
+sum(complete.cases(trainRaw))
+
+trainRaw <- trainRaw[, colSums(is.na(trainRaw)) == 0] 
+
+testRaw <- testRaw[, colSums(is.na(testRaw)) == 0]
+```
+
+#### Reduce No of colums; keep ones that help in our Accelerometer Measurments analysis.
+```{r cache=TRUE}
+classe <- trainRaw$classe
+
+# Training dataset
+trainReduct <- grepl("^X|timestamp|window", names(trainRaw))
+trainRaw <- trainRaw[, !trainReduct]
+
+trainTidy <- trainRaw[, sapply(trainRaw, is.numeric)]
+trainTidy$classe <- classe
+
+# Testing dataset 
+testReduct <- grepl("^X|timestamp|window", names(testRaw))
+testRaw <- testRaw[, !testReduct]
+testTidy <- testRaw[, sapply(testRaw, is.numeric)]
+```
+
+##### We have <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">19622</span> training observations, <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">20</span> testing observations, and both of <span style="background-color:#69779B; color:#F0ECE2; padding:.2em; border-radius:.2em">53</span> variables.
+
+### 4. Data Slicing.
+#### Here we can split the **tidy tarining data** into 70% for pure training and 30% for validation that will be used in **Cross Validation** soon.
+```{r cache=TRUE}
+set.seed(22519)
+inTrain <- createDataPartition(trainTidy$classe, p = 0.70, list = F)
+trainData <- trainTidy[inTrain, ]
+testData <- trainTidy[-inTrain, ]
+```
+
+### 5. Data Modelung.
+#### Using **5-fold cross validation** to apply **Random Forest** Algorithm which automatically select the variables based on their importance.
+
+```{r, cache=TRUE}
+controlRf <- trainControl(method = "cv", 5)
+
+modelRf <- train(classe ~ ., data = trainData, method = "rf", trControl = controlRf, ntree = 250)
+
+modelRf
+```
+
+### 6. Measure the performance:
+#### Using **confusion Matrix** to measure the performance of **classification model** on the validation dataset.
+```{r prediction, cache=TRUE}
+predictRf <- predict(modelRf, testData)
+
+confusionMatrix(testData$classe, predictRf)
+```
+
+### 7. Calculate the Accuracy:
+```{r accuracy, cache=TRUE}
+accuracy <- postResample(predictRf, testData$classe)
+
+accuracy
+```
+
+```{r cache=TRUE}
+oose <- 1 - as.numeric(confusionMatrix(testData$classe, predictRf)$overall[1])
+
+oose
+```
+
+### 8. Prediction for Testing Dataset
+#### Finally we will apply the original testing dataset model trimng problem_id column.
+```{r cache=TRUE}
+result <- predict(modelRf, testTidy[, -length(names(testTidy))])
+
+result
+```
+
+### 9. Plots:
+#### A. Correlation Matrix Visualization
+```{r correlationMatrix, cache=TRUE}
+corrPlot <- cor(trainData[, -length(names(trainData))])
+
+corrplot(corrPlot, method="square")
+
+```
+
+#### B. Decision Tree Visualization
+```{r treeModel, cache=TRUE}
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+
+prp(treeModel)
+```
+
+[1]: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv "pml-training.csv"
+[2]: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv "pml-testing.csv"
+[3]: https://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har "HAR siteing"{target="_blank"}
+
